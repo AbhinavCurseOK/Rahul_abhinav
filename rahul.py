@@ -11,17 +11,6 @@ st.set_page_config(page_title="Image Review App", layout="centered")
 EXCEL_PATH = "failed28.xlsx"  # Input Excel file
 OUTPUT_PATH = "updated_results.xlsx"  # Shared output file
 
-
-# Hide the footer and Streamlit branding
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .css-164nlkn {display: none}  /* For some Streamlit versions */
-    </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
 # ========== USER INFO ==========
 if "user_name" not in st.session_state:
     st.session_state.user_name = ""
