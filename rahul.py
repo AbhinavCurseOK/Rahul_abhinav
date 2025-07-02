@@ -47,16 +47,15 @@ def load_excel():
         df["Reviewed by"] = ""
     return df
 
-# Always load the latest data for multi-user support
+# Always load the latest data
 df_all = load_excel()
 if df_all is None:
     st.error(f"Input file '{EXCEL_PATH}' not found.")
     st.stop()
 
-# Optional: Load progress from shared file if exists
+# Load progress if file exists
 if Path(OUTPUT_PATH).exists():
     df_saved = pd.read_excel(OUTPUT_PATH)
-
     if "actual_image_path" in df_all.columns and "actual_image_path" in df_saved.columns:
         df_all.set_index("actual_image_path", inplace=True)
         df_saved.set_index("actual_image_path", inplace=True)
@@ -71,17 +70,40 @@ if Path(OUTPUT_PATH).exists():
 if "index" not in st.session_state:
     st.session_state.index = 0
 
-# Filter unreviewed rows (NaN or empty)
+# Filter unreviewed rows
 df_filtered = df_all[df_all["Reviewed by"].isna() | (df_all["Reviewed by"].astype(str).str.strip() == "")].reset_index(drop=True)
 
 # ========== UI ==========
 st.title(f"Image Annotation Interface - Reviewer: {user_name}")
 
-#Progress Info
+# Progress Info
 st.info(f"Total: {len(df_all)} | Reviewed: {df_all[df_all['Reviewed by'].notna() & (df_all['Reviewed by'].astype(str).str.strip() != '')].shape[0]} | Pending: {len(df_filtered)}")
 
+# ========== ALWAYS VISIBLE DOWNLOAD BUTTON FOR ALLOWED USERS ==========
+allowed_users = ["rahul pushp", "kumar abhinav"]
+if user_name.strip().lower() in allowed_users and Path(OUTPUT_PATH).exists():
+    try:
+        with open(OUTPUT_PATH, "rb") as f:
+            excel_data = f.read()
+        st.download_button(
+            label="Download Final Excel File",
+            data=excel_data,
+            file_name="final_review_results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        st.error(f"Could not prepare download: {e}")
+
+# ========== MAIN REVIEW INTERFACE ==========
 if len(df_filtered) == 0:
-    st.success("All images have already been reviewed by someone.")
+    st.success("All images have already been reviewed.")
+
+    if st.button("Save Final File"):
+        if save_with_retry(df_all, OUTPUT_PATH):
+            st.success(f"Final file saved as: `{OUTPUT_PATH}`")
+        else:
+            st.warning("Unable to save. Please ensure the file is not open elsewhere.")
+
 else:
     i = st.session_state.index
     if i < len(df_filtered):
@@ -105,14 +127,13 @@ else:
         except Exception as e:
             st.error(f"Failed to load image: {e}")
 
-        # ========== Predicted vs Actual (Reading) ==========
+        # ========== Predicted vs Actual ==========
         col_r1, col_r2 = st.columns([1, 1])
         with col_r1:
             st.markdown(f"**Predicted Reading:** `{row.get('pred_readings', '')}`")
         with col_r2:
             actual_reading = st.text_input("Actual Reading:", value=row.get("Actual reading", ""))
 
-        # ========== Predicted vs Actual (Unit) ==========
         col_u1, col_u2 = st.columns([1, 1])
         with col_u1:
             st.markdown(f"**Predicted Unit:** `{row.get('pred_units', '')}`")
@@ -132,8 +153,3 @@ else:
                 st.warning("Could not save to Excel. Please close the file and try again.")
     else:
         st.success("You have reviewed all available images.")
-        if st.button("Save Final File"):
-            if save_with_retry(df_all, OUTPUT_PATH):
-                st.success(f"Final file saved as: `{OUTPUT_PATH}`")
-            else:
-                st.warning("Unable to save. Please ensure the file is not open elsewhere.")
